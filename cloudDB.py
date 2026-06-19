@@ -5,55 +5,6 @@ from pinecone import Pinecone
 
 app = FastAPI()
 
-class EmbeddingManager:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        self.model_name = model_name
-        self.model = None
-
-    def _load_model(self):
-
-        if self.model is None:
-
-            # Lazy import
-            from sentence_transformers import (
-                SentenceTransformer
-            )
-
-            self.model = (
-                SentenceTransformer(
-                    self.model_name
-                )
-            )
-        
-    def generate_embeddings(self, texts):
-        self._load_model()
-        embeddings = self.model.encode(texts)
-        return embeddings
-
-embedding = EmbeddingManager()
-def clean_text(value):
-
-    if pd.isna(value):
-        return ""
-
-    return str(value).strip()
-
-
-def extract_names(json_string):
-    if pd.isna(json_string) or json_string == "":
-        return ""
-
-    try:
-        data = json.loads(json_string)
-
-        names = [item["name"] for item in data if "name" in item]
-
-        return ", ".join(names)
-
-    except Exception:
-        return ""
-
-
 @app.get("/retreiver-movies")
 def getRelatedMovies():
     df = pd.read_csv("movies.csv")
@@ -65,46 +16,20 @@ def getRelatedMovies():
         return {"error": "Movie not found", "title": "Furious 7"}
 
     movie = matched_movies.iloc[0]
-    title = movie.get("title", "")
-    overview = movie.get("overview", "")
-    tagline = movie.get("tagline", "")
-
-    genres = extract_names(movie.get("genres", ""))
-    keywords = extract_names(movie.get("keywords", ""))
-    production_companies = extract_names(movie.get("production_companies", ""))
-    combined_text = f"""
-        Movie Title:
-        {title}
-
-        Genres:
-        {genres}
-
-        This movie belongs to:
-        {genres}
-
-        Overview:
-        {overview}
-
-        Themes and Keywords:
-        {keywords}
-
-        Keywords:
-        {keywords}
-
-        Tagline:
-        {tagline}
-
-        Produced By:
-        {production_companies}
-        """.strip()
-    
-    query_embedding = embedding.generate_embeddings([combined_text])[0]
-
-    # Convert numpy array to list
-    query_embedding = query_embedding.tolist()
+    movie_id = str(movie.get("id", ""))
+    fetch_result = index.fetch(
+    ids=[movie_id],
+    namespace="movie-namespace"
+    )
+    query_vector = (
+    fetch_result
+    ["vectors"]
+    [movie_id]
+    ["values"]
+    )
     results = index.query(
         namespace="movie-namespace",
-        vector=query_embedding, 
+        vector=query_vector, 
         top_k=5,
         include_metadata=True,
         include_values=False
