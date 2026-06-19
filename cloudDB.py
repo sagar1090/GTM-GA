@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 import json
 import pandas as pd
-from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
 
 app = FastAPI()
@@ -10,15 +9,28 @@ class EmbeddingManager:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         self.model_name = model_name
         self.model = None
-        self._load_model()
 
     def _load_model(self):
-        self.model = SentenceTransformer(self.model_name)
+
+        if self.model is None:
+
+            # Lazy import
+            from sentence_transformers import (
+                SentenceTransformer
+            )
+
+            self.model = (
+                SentenceTransformer(
+                    self.model_name
+                )
+            )
         
     def generate_embeddings(self, texts):
+        self._load_model()
         embeddings = self.model.encode(texts)
         return embeddings
 
+embedding = EmbeddingManager()
 def clean_text(value):
 
     if pd.isna(value):
@@ -44,7 +56,6 @@ def extract_names(json_string):
 
 @app.get("/retreiver-movies")
 def getRelatedMovies():
-    embedding = EmbeddingManager()
     df = pd.read_csv("movies.csv")
     pc = Pinecone(api_key="pcsk_6TrCS2_4LiK45erZMq9j4ncT6Nzi8HUJQBxD3Hk3KK2ZGDgn6HjzA2tokYGR7xgjGnpMr6")
     index = pc.Index(host="https://test-ul0krd9.svc.aped-4627-b74a.pinecone.io")
