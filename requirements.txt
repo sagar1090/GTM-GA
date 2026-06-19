@@ -4,4 +4,3 @@ pandas
 numpy
 pinecone
 sentence-transformers
-torch
